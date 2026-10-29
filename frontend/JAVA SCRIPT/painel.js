@@ -1,12 +1,7 @@
-import { localidades, filtrarLocalidades } from './dados-demonstrativos.js';
+import { criarCartoes } from './cartoes.js?v=20261029a';
+import { localidades, filtrarLocalidades } from './dados-demonstrativos.js?v=20261029a';
 
-const dashboardPorLocal = Object.freeze({
-  'sao-paulo': 'dashboard.html?local=sao-paulo',
-  campinas: 'dashboard.html?local=campinas',
-  sorocaba: 'dashboard.html?local=sorocaba',
-  santos: 'dashboard.html?local=santos',
-  curitiba: 'dashboard.html?local=curitiba'
-});
+const dashboardPorLocal = Object.fromEntries(localidades.map(local => [local.id, local.rota]));
 
 const lista = document.querySelector('#lista-localidades');
 const carrossel = document.querySelector('.carrossel');
@@ -14,7 +9,7 @@ const paginacao = document.querySelector('.paginacao');
 const busca = document.querySelector('#busca');
 const movimentoReduzido = matchMedia('(prefers-reduced-motion: reduce)');
 let disponiveis = [...localidades];
-let selecionada = 'sorocaba';
+let selecionada = localidades.find(local => local.id === 'sorocaba')?.id || localidades[0]?.id;
 let inicioGesto = null;
 let bloquearClique = false;
 let quadroCentralizacao = 0;
@@ -33,7 +28,7 @@ function atualizarCartoes() {
   lista.querySelectorAll('[data-localidade]').forEach(cartao => {
     const ativo = cartao.dataset.localidade === selecionada;
     cartao.classList.toggle('selecionada', ativo);
-    cartao.querySelector('article').setAttribute('aria-current', String(ativo));
+    cartao.querySelector('a').setAttribute('aria-current', String(ativo));
   });
   paginacao.querySelectorAll('button').forEach(botao => {
     botao.setAttribute('aria-pressed', String(botao.dataset.selecionar === selecionada));
@@ -126,17 +121,11 @@ function abrirDashboard(id) {
 }
 
 function abrirLocalidade(evento) {
+  if (evento.target.closest('a')) return;
   const cartao = evento.target.closest('[data-localidade]');
   if (cartao) return abrirDashboard(cartao.dataset.localidade);
   const indicador = evento.target.closest('[data-selecionar]');
   if (indicador) selecionar(indicador.dataset.selecionar);
-}
-
-function ativarCardTeclado(evento) {
-  if (!evento.target.matches('[data-dashboard]')) return;
-  if (!['Enter', ' '].includes(evento.key)) return;
-  evento.preventDefault();
-  if (!evento.repeat) abrirDashboard(evento.target.dataset.dashboard);
 }
 
 function selecionarCardFocado(evento) {
@@ -161,17 +150,19 @@ function navegarTeclado(evento) {
   else return;
   evento.preventDefault();
   const destino = carrossel.contains(evento.target)
-    ? lista.querySelector('.selecionada article') : paginacao.querySelector('[aria-pressed="true"]');
+    ? lista.querySelector('.selecionada a') : paginacao.querySelector('[aria-pressed="true"]');
   destino?.focus({ preventScroll: true });
 }
 
 function filtrar() {
   disponiveis = filtrarLocalidades(busca.value);
+  carrossel.hidden = !disponiveis.length;
+  paginacao.hidden = !disponiveis.length;
   lista.querySelectorAll('[data-localidade]').forEach(cartao => {
     cartao.hidden = !disponiveis.some(local => local.id === cartao.dataset.localidade);
   });
   criarPaginacao();
-  escrever('contagem-localidades', `${disponiveis.length} localidades demonstrativas`);
+  escrever('contagem-localidades', `${disponiveis.length} localidades · dados demonstrativos`);
   escrever('resultado-busca', disponiveis.length ? '' : 'Nenhuma cidade encontrada. Tente buscar outra localidade.');
   if (!disponiveis.some(local => local.id === selecionada)) selecionar(disponiveis[0]?.id);
   atualizarCartoes();
@@ -246,7 +237,6 @@ function atualizarNavegacao() {
 }
 
 function conectarGestos() {
-  lista.addEventListener('keydown', ativarCardTeclado);
   lista.addEventListener('focusin', selecionarCardFocado);
   lista.addEventListener('pointerdown', iniciarGesto);
   lista.addEventListener('pointermove', moverGesto);
@@ -272,6 +262,8 @@ function conectarControles() {
 }
 
 function iniciar() {
+  criarCartoes();
+  escrever('contagem-localidades', `${localidades.length} localidades · dados demonstrativos`);
   document.querySelectorAll('[data-selecionar], #busca').forEach(item => { item.disabled = false; });
   criarPaginacao();
   atualizarLocalidade(localidades.find(local => local.id === selecionada));
